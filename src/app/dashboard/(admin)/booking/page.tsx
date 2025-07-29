@@ -122,11 +122,7 @@ const BookingList: React.FC = () => {
                   <TableCell>{booking.trip}</TableCell>
                   <TableCell>{booking.seat_class}</TableCell>
                   <TableCell>{booking.passenger}</TableCell>
-                  <TableCell>
-                    {booking.seat_class.toLowerCase() === "business"
-                      ? "Hidden"
-                      : booking.settled}
-                  </TableCell>
+                  <TableCell>{booking.settled}</TableCell>
                 </TableRow>
               ))}
               {currentData.length === 0 && (
