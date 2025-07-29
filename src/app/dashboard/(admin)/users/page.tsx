@@ -3,7 +3,8 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-
+import { useEffect } from "react";
+import { addYears, format } from "date-fns";
 import {
   Form,
   FormControl,
@@ -26,16 +27,20 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Admin from "../../page";
 
+import { usersDetails } from "@/api/api";
+
 // 1. Define schema
 const formSchema = z.object({
-  name: z.string(),
-  role: z.string(),
-  address: z.string(),
-  birthdate: z.string(),
-  contact: z.string(),
-  rfid: z.string(),
-  paymentMethod: z.string(),
-  rfidExpiry: z.string(),
+  name: z.string().min(1),
+  role: z.string().min(1),
+  address: z.string().min(1),
+  birthdate: z.string().min(1),
+  contact: z.string().min(11), // phone number
+  rfid: z.string().min(1),
+  rfidCreated: z.string().min(1),
+  rfidExpiry: z.string().min(1),
+  balance: z.string().min(3),
+  paymentMethod: z.string().min(1),
 });
 
 // 2. Component
@@ -44,19 +49,51 @@ const CreateUsers = () => {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      role: "",
+      role: "Customers",
       address: "",
       birthdate: "",
       contact: "",
       rfid: "",
-      paymentMethod: "",
+      rfidCreated: new Date().toISOString().split("T")[0],
       rfidExpiry: "",
+      balance: "1000",
+      paymentMethod: "",
     },
   });
 
-  const onSubmit = (values: any) => {
-    console.log(values);
+  const onSubmit = async (values: any) => {
+    const success = await usersDetails(
+      values.name,
+      values.role, // "Customers"
+      values.birthdate,
+      values.address,
+      values.contact,
+      values.rfid,
+      values.rfidCreated,
+      values.rfidExpiry,
+      values.balance, // 1000
+      values.paymentMethod
+    );
+
+    if (success) {
+      alert("User details saved successfully!");
+      form.reset();
+    } else {
+      alert("Failed to save user details.");
+    }
   };
+
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === "rfidCreated" && value.rfidCreated) {
+        const expiryDate = addYears(new Date(value.rfidCreated), 2);
+        const formattedExpiry = format(expiryDate, "yyyy-MM-dd");
+        form.setValue("rfidExpiry", formattedExpiry);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   return (
     <Admin>
@@ -64,7 +101,6 @@ const CreateUsers = () => {
         <Card className="p-6">
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* LEFT: Form */}
               <div className="lg:col-span-2 space-y-4">
                 <div className="flex items-center gap-2">
                   <h2 className="text-xl font-semibold">Create Clients</h2>
@@ -98,7 +134,11 @@ const CreateUsers = () => {
                           <FormItem>
                             <FormLabel>Role</FormLabel>
                             <FormControl>
-                              <Input placeholder="Customer" {...field} />
+                              <Input
+                                placeholder="Customer"
+                                {...field}
+                                readOnly
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -162,6 +202,44 @@ const CreateUsers = () => {
 
                       <FormField
                         control={form.control}
+                        name="rfidCreated"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>RFID Created</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="rfidExpiry"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>RFID Expiry</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} readOnly />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="balance"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>RFID Balance</FormLabel>
+                            <FormControl>
+                              <Input placeholder="1000" {...field} readOnly />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
                         name="paymentMethod"
                         render={({ field }) => (
                           <FormItem>
@@ -180,19 +258,6 @@ const CreateUsers = () => {
                                 <SelectItem value="Card">Card</SelectItem>
                               </SelectContent>
                             </Select>
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="rfidExpiry"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>RFID Expiry</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
                           </FormItem>
                         )}
                       />

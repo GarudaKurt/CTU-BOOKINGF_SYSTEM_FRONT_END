@@ -24,23 +24,24 @@ import {
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Admin from "../../page";
+import { getUserDetailsByRFID, updateRFIDBalance } from "@/api/api";
 
 // 1. Define schema
 const formSchema = z.object({
   rfid: z.string(),
-  balance: z.string(),
-  topup: z.string(),
+  balance: z.union([z.string(), z.number()]).optional(), // Accept number or string
+  topup: z.string().optional(),
   name: z.string(),
   role: z.string(),
   address: z.string(),
   birthdate: z.string(),
-  contact: z.string(),
+  contact: z.union([z.string(), z.number()]), // Accept number or string
   paymentMethod: z.string(),
   rfidExpiry: z.string(),
 });
 
 // 2. Component
-const CreateUsers = () => {
+const ReloadRFID = () => {
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -50,18 +51,62 @@ const CreateUsers = () => {
       birthdate: "",
       contact: "",
       rfid: "",
+      balance: "",
+      topup: "",
       paymentMethod: "",
       rfidExpiry: "",
     },
   });
 
-  const onSubmit = (values: any) => {
-    console.log(values);
+  const onSubmit = async (values: any) => {
+    const { rfid, balance, topup } = values;
+
+    const topupAmount = parseFloat(topup);
+    const currentBalance = parseFloat(balance);
+
+    if (isNaN(topupAmount) || topupAmount <= 0) {
+      alert("Enter a valid top-up amount");
+      return;
+    }
+
+    const success = await updateRFIDBalance(rfid, topupAmount);
+
+    if (success) {
+      alert("Balance updated successfully!");
+
+      // Update balance in form immediately
+      form.setValue("balance", (currentBalance + topupAmount).toFixed(2));
+      form.setValue("topup", "");
+
+      // Or: await handleSearch(rfid); // if you want to re-fetch
+    } else {
+      alert("Failed to update balance.");
+    }
   };
 
-  const handleSearch = (rfid: string) => {
-    console.log("Searching RFID:", rfid);
-    // Call backend or set data...
+  const handleSearch = async (rfid: string) => {
+    if (!rfid) return;
+
+    const userData = await getUserDetailsByRFID(rfid);
+    if (userData) {
+      console.log("User found:", userData);
+
+      // Reset form values with fetched user data
+      form.reset({
+        rfid: userData.rfid_number,
+        balance: userData.rfid_balance,
+        topup: "",
+        name: userData.fullname,
+        role: userData.role,
+        address: userData.address,
+        birthdate: userData.birthdate,
+        contact: userData.phone,
+        paymentMethod: userData.payment,
+        rfidExpiry: userData.expiry_rfid,
+      });
+    } else {
+      alert("No user found with that RFID");
+    }
   };
 
   return (
@@ -101,9 +146,9 @@ const CreateUsers = () => {
                                   size="icon"
                                   className="absolute right-1 top-1/2 -translate-y-1/2"
                                   variant="ghost"
-                                  onClick={() => {
-                                    handleSearch;
-                                  }}
+                                  onClick={() =>
+                                    handleSearch(form.getValues("rfid"))
+                                  }
                                 >
                                   <Search className="w-4 h-4" />
                                 </Button>
@@ -115,12 +160,17 @@ const CreateUsers = () => {
 
                       <FormField
                         control={form.control}
-                        name="rfid"
+                        name="balance"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Balance</FormLabel>
                             <FormControl>
-                              <Input disabled placeholder="100.00" {...field} />
+                              <Input
+                                disabled
+                                placeholder="100.00"
+                                {...field}
+                                readOnly
+                              />
                             </FormControl>
                           </FormItem>
                         )}
@@ -128,12 +178,12 @@ const CreateUsers = () => {
 
                       <FormField
                         control={form.control}
-                        name="rfid"
+                        name="topup"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Top-up Amount</FormLabel>
                             <FormControl>
-                              <Input placeholder="1000.00" {...field} />
+                              <Input placeholder="" {...field} />
                             </FormControl>
                           </FormItem>
                         )}
@@ -146,7 +196,11 @@ const CreateUsers = () => {
                           <FormItem>
                             <FormLabel>Name</FormLabel>
                             <FormControl>
-                              <Input placeholder="Client Name" {...field} />
+                              <Input
+                                placeholder="Client Name"
+                                {...field}
+                                readOnly
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -160,7 +214,11 @@ const CreateUsers = () => {
                           <FormItem>
                             <FormLabel>Role</FormLabel>
                             <FormControl>
-                              <Input placeholder="Customer" {...field} />
+                              <Input
+                                placeholder="Customer"
+                                {...field}
+                                readOnly
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -177,6 +235,7 @@ const CreateUsers = () => {
                               <Input
                                 placeholder="Customer Address"
                                 {...field}
+                                readOnly
                               />
                             </FormControl>
                           </FormItem>
@@ -190,7 +249,7 @@ const CreateUsers = () => {
                           <FormItem>
                             <FormLabel>Birthdate</FormLabel>
                             <FormControl>
-                              <Input type="date" {...field} />
+                              <Input type="date" {...field} readOnly />
                             </FormControl>
                           </FormItem>
                         )}
@@ -203,7 +262,11 @@ const CreateUsers = () => {
                           <FormItem>
                             <FormLabel>Contact Number</FormLabel>
                             <FormControl>
-                              <Input placeholder="Cellphone #" {...field} />
+                              <Input
+                                placeholder="Cellphone #"
+                                {...field}
+                                readOnly
+                              />
                             </FormControl>
                           </FormItem>
                         )}
@@ -240,7 +303,7 @@ const CreateUsers = () => {
                           <FormItem>
                             <FormLabel>RFID Expiry</FormLabel>
                             <FormControl>
-                              <Input type="date" {...field} />
+                              <Input type="date" {...field} readOnly />
                             </FormControl>
                           </FormItem>
                         )}
@@ -280,4 +343,4 @@ const CreateUsers = () => {
   );
 };
 
-export default CreateUsers;
+export default ReloadRFID;

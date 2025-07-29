@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import {
   Table,
   TableBody,
@@ -29,6 +30,9 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import Admin from "../../page";
+import { updateUserDetails, deleteUserDetails } from "@/api/api";
+
+const USERS_API_URL = "http://localhost:8000/api/details/";
 
 type User = {
   id: number;
@@ -42,112 +46,56 @@ type User = {
   Role: string;
 };
 
-const userDetails: User[] = [
-  {
-    id: 1,
-    Fullname: "Aldren L. Letada",
-    Birthdate: "04/29/1998",
-    Address: "Cebu City",
-    Status: "Active",
-    RFID: "187423948",
-    Exipiry: "12/12/2026",
-    Payment: "Cash",
-    Role: "Customer",
-  },
-  {
-    id: 2,
-    Fullname: "Maria Clara",
-    Birthdate: "11/02/1993",
-    Address: "Lapu-Lapu",
-    Status: "Active",
-    RFID: "1111222233",
-    Exipiry: "09/09/2026",
-    Payment: "Card",
-    Role: "Customer",
-  },
-  {
-    id: 3,
-    Fullname: "Jose Rizal",
-    Birthdate: "06/19/1861",
-    Address: "Calamba",
-    Status: "Inactive",
-    RFID: "3333444455",
-    Exipiry: "05/05/2025",
-    Payment: "Cash",
-    Role: "Staff",
-  },
-  {
-    id: 4,
-    Fullname: "Juan Dela Cruz",
-    Birthdate: "05/12/1995",
-    Address: "Mandaue",
-    Status: "Inactive",
-    RFID: "193847564",
-    Exipiry: "01/01/2025",
-    Payment: "Gcash",
-    Role: "Admin",
-  },
-  {
-    id: 5,
-    Fullname: "Andres Bonifacio",
-    Birthdate: "11/30/1863",
-    Address: "Tondo",
-    Status: "Active",
-    RFID: "5566778899",
-    Exipiry: "12/12/2026",
-    Payment: "Cash",
-    Role: "Staff",
-  },
-  {
-    id: 6,
-    Fullname: "Emilio Aguinaldo",
-    Birthdate: "03/22/1869",
-    Address: "Cavite",
-    Status: "Inactive",
-    RFID: "9988776655",
-    Exipiry: "10/10/2027",
-    Payment: "Gcash",
-    Role: "Customer",
-  },
-  {
-    id: 7,
-    Fullname: "Gregorio Del Pilar",
-    Birthdate: "11/14/1875",
-    Address: "Bulacan",
-    Status: "Active",
-    RFID: "4455667788",
-    Exipiry: "11/11/2027",
-    Payment: "Card",
-    Role: "Customer",
-  },
-  {
-    id: 8,
-    Fullname: "Melchora Aquino",
-    Birthdate: "01/06/1812",
-    Address: "Caloocan",
-    Status: "Active",
-    RFID: "7777888899",
-    Exipiry: "01/01/2028",
-    Payment: "Cash",
-    Role: "Support",
-  },
-];
-
 const ITEMS_PER_PAGE = 7;
 
 const UserInfo: React.FC = () => {
+  const [users, setUsers] = useState<User[]>([]);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<User | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
-  const totalPages = Math.ceil(userDetails.length / ITEMS_PER_PAGE);
+  const filteredUsers = users.filter((user) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      user.Fullname.toLowerCase().includes(term) ||
+      user.Status.toLowerCase().includes(term)
+    );
+  });
 
+  const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const currentData = userDetails.slice(
+  const currentData = filteredUsers.slice(
     startIndex,
     startIndex + ITEMS_PER_PAGE
   );
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await axios.get(USERS_API_URL, { withCredentials: true });
+        const transformed = res.data.map(
+          (u: any, index: number): User => ({
+            id: u.userid || index,
+            Fullname: u.fullname,
+            Birthdate: u.birthdate,
+            Address: u.address,
+            Status: parseFloat(u.rfid_balance) > 0 ? "Active" : "Inactive",
+            RFID: u.rfid_number,
+            Exipiry: u.expiry_rfid,
+            Payment: u.payment,
+            Role: u.role,
+          })
+        );
+        setUsers(transformed);
+      } catch (err) {
+        console.error("Failed to fetch users:", err);
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   const handlePrevious = () => {
     if (currentPage > 1) setCurrentPage(currentPage - 1);
@@ -159,8 +107,23 @@ const UserInfo: React.FC = () => {
 
   const handleEdit = (user: User) => {
     setSelectedUser(user);
-    setEditForm({ ...user }); // clone to separate edit state
+    setEditForm({ ...user });
     setIsDialogOpen(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this user?"
+    );
+    if (!confirmed) return;
+
+    const success = await deleteUserDetails(id);
+    if (success) {
+      console.log("User deleted successfully");
+      setUsers((prev) => prev.filter((user) => user.id !== id)); // Update UI
+    } else {
+      console.error("Failed to delete user");
+    }
   };
 
   const handleInputChange = (
@@ -171,21 +134,48 @@ const UserInfo: React.FC = () => {
     setEditForm({ ...editForm, [key]: e.target.value });
   };
 
-  const handleSave = () => {
-    console.log("Save user:", editForm);
-    setIsDialogOpen(false);
-    // Apply the save to backend or state here
+  const handleSave = async () => {
+    if (!editForm) return;
+
+    const payload = {
+      fullname: editForm.Fullname,
+      role: editForm.Role,
+      birthdate: editForm.Birthdate,
+      address: editForm.Address,
+      rfid_number: editForm.RFID,
+      expiry_rfid: editForm.Exipiry,
+      payment: editForm.Payment,
+    };
+
+    const success = await updateUserDetails(editForm.id, payload);
+
+    if (success) {
+      console.log("User updated successfully");
+      setIsDialogOpen(false);
+      // Optional: Refresh users list from server here
+    } else {
+      console.error("Failed to update user");
+    }
   };
 
   return (
     <Admin>
-      <Card className="p-6">
+      <Card className="w-full p-6 overflow-x-auto">
         <CardContent>
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-semibold">Information</h2>
             <Pencil size={18} className="text-blue-500" />
           </div>
-          <Input className="flex flex-end max-w-xs" placeholder="Search" />
+          <Input
+            className="flex flex-end max-w-xs mb-4"
+            placeholder="Search by Fullname or Status"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1); // Reset to first page when searching
+            }}
+          />
+
           <br />
 
           <Table>
@@ -193,12 +183,12 @@ const UserInfo: React.FC = () => {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[20px]">ID</TableHead>
-                <TableHead className="w-[20px]">Fullname</TableHead>
+                <TableHead className="w-[200px]">Fullname</TableHead>
                 <TableHead className="w-[20px]">Birthdate</TableHead>
-                <TableHead className="w-[20px]">Address</TableHead>
+                <TableHead className="w-[180px]">Address</TableHead>
                 <TableHead className="w-[20px]">Status</TableHead>
-                <TableHead className="w-[20px]">RFID</TableHead>
-                <TableHead className="w-[20px]">Expiry</TableHead>
+                <TableHead className="w-[250px]">RFID</TableHead>
+                <TableHead className="w-[100px]">Expiry</TableHead>
                 <TableHead className="w-[20px]">Payment</TableHead>
                 <TableHead className="w-[20px]">Role</TableHead>
                 <TableHead className="text-center">Actions</TableHead>

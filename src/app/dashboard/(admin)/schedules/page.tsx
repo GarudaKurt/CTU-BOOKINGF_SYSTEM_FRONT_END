@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { CalendarIcon, PlusCircle } from "lucide-react";
 
@@ -40,15 +40,53 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 
-// Card for each schedule
-const ScheduleCard: React.FC = () => (
+import { createSchedules, getSchedules, bookings } from "@/api/api";
+
+type ScheduleProps = {
+  origin: string;
+  destination: string;
+  departure_date: string;
+  return_date: string;
+  price_economy_class: string;
+  price_business_class?: string;
+  onSelectClick?: (schedule: ScheduleProps) => void;
+};
+
+// ScheduleCard component with onSelectClick prop
+const ScheduleCard: React.FC<ScheduleProps> = ({
+  origin,
+  destination,
+  departure_date,
+  return_date,
+  price_economy_class,
+  price_business_class,
+  onSelectClick,
+}) => (
   <Card className="w-full md:w-50">
     <CardContent className="pt-6 text-center space-y-1">
-      <p className="text-sm font-medium">Cebu ➜ Bantayan</p>
-      <p className="text-muted-foreground text-xs">Fri, Jul 7 2025</p>
+      <p className="text-sm font-medium">
+        {origin} ➜ {destination}
+      </p>
+      <p className="text-muted-foreground text-xs">
+        {new Date(departure_date).toDateString()}
+      </p>
       <p className="text-red-500 text-xs">Start From</p>
-      <p className="font-semibold text-sm">₱1000.00 / Pax</p>
-      <Button size="sm" className="mt-2 w-full bg-red-500 hover:bg-red-600">
+      <p className="font-semibold text-sm">₱{price_economy_class} / Pax</p>
+      <Button
+        size="sm"
+        className="mt-2 w-full bg-red-500 hover:bg-red-600"
+        onClick={() =>
+          onSelectClick &&
+          onSelectClick({
+            origin,
+            destination,
+            departure_date,
+            return_date,
+            price_economy_class,
+            price_business_class,
+          })
+        }
+      >
         Select
       </Button>
     </CardContent>
@@ -58,7 +96,154 @@ const ScheduleCard: React.FC = () => (
 const Schedules: React.FC = () => {
   const [departureDate, setDepartureDate] = useState<Date>();
   const [returnDate, setReturnDate] = useState<Date>();
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isSheetOpen, setIsSheetOpen] = useState<boolean>(false);
+  const [origin, setOrigin] = useState<string>("");
+  const [destination, setDestination] = useState<string>("");
+  const [priceEconomy, setPriceEconomy] = useState<string>("");
+  const [priceBusiness, setPriceBusiness] = useState<string>("");
+  const [payment, setPayment] = useState<number>(0);
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Filters state for live filtering
+  const [filterOrigin, setFilterOrigin] = useState("");
+  const [filterDestination, setFilterDestination] = useState("");
+
+  // Modal state for Select modal
+  const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] =
+    useState<ScheduleProps | null>(null);
+
+  // Modal form states
+  const [rfid, setRfid] = useState("");
+  const [tripType, setTripType] = useState("");
+  const [seatClass, setSeatClass] = useState("");
+  const [passengers, setPassengers] = useState("");
+
+  useEffect(() => {
+    if (!selectedSchedule || !seatClass || !passengers) {
+      setPayment(0);
+      return;
+    }
+
+    const price =
+      seatClass === "Economy"
+        ? Number(selectedSchedule.price_economy_class)
+        : Number(selectedSchedule.price_business_class || 0); // add this field if not already in your data
+
+    const total = price * Number(passengers || 0);
+    setPayment(total);
+  }, [seatClass, passengers, selectedSchedule]);
+
+  useEffect(() => {
+    const fetchSchedules = async () => {
+      const data = await getSchedules();
+      if (data) setSchedules(data);
+      setLoading(false);
+    };
+
+    fetchSchedules();
+  }, []);
+
+  // Filter schedules based on origin and destination filters (case insensitive)
+  const filteredSchedules = schedules.filter((schedule) => {
+    return (
+      schedule.origin.toLowerCase().includes(filterOrigin.toLowerCase()) &&
+      schedule.destination
+        .toLowerCase()
+        .includes(filterDestination.toLowerCase())
+    );
+  });
+
+  const handleSaveSchedule = async () => {
+    if (!origin || !destination || !departureDate || !returnDate) {
+      alert("Please fill in all fields.");
+      return;
+    }
+
+    const success = await createSchedules(
+      origin,
+      destination,
+      departureDate.toISOString().split("T")[0],
+      returnDate.toISOString().split("T")[0],
+      priceEconomy,
+      priceBusiness
+    );
+
+    if (success) {
+      alert("Schedule created successfully!");
+      setIsSheetOpen(false);
+      setOrigin("");
+      setDestination("");
+      setDepartureDate(undefined);
+      setReturnDate(undefined);
+      setPriceEconomy("");
+      setPriceBusiness("");
+
+      // Refresh schedules
+      const data = await getSchedules();
+      if (data) setSchedules(data);
+    } else {
+      alert("Failed to create schedule.");
+    }
+  };
+
+  const handleSelectClick = (schedule: ScheduleProps) => {
+    setSelectedSchedule(schedule);
+    setIsSelectModalOpen(true);
+
+    // Reset modal form fields
+    setRfid("");
+    setTripType("");
+    setSeatClass("");
+    setPassengers("");
+  };
+
+  const handleSubmit = async () => {
+    if (!rfid || !tripType || !seatClass || !passengers || !selectedSchedule) {
+      alert("Please fill in all fields.");
+      return;
+    }
+
+    const passengerCount = Number(passengers);
+    if (passengerCount <= 0) {
+      alert("Passengers must be greater than 0.");
+      return;
+    }
+
+    const returnDateStr =
+      tripType === "Round Trip"
+        ? selectedSchedule.return_date
+        : selectedSchedule.departure_date;
+
+    const success = await bookings(
+      rfid,
+      selectedSchedule.origin,
+      selectedSchedule.destination,
+      selectedSchedule.departure_date,
+      returnDateStr, // only include if Round Trip
+      tripType,
+      seatClass,
+      passengerCount,
+      payment
+    );
+
+    if (success) {
+      alert("Booking successful!");
+      setIsSelectModalOpen(false);
+
+      // Reset fields (optional)
+      setRfid("");
+      setTripType("");
+      setSeatClass("");
+      setPassengers("");
+      setPayment(0);
+
+      // Optionally refresh bookings or schedules here if needed
+    } else {
+      alert("Booking failed. Please try again.");
+    }
+  };
 
   return (
     <Admin>
@@ -110,8 +295,17 @@ const Schedules: React.FC = () => {
 
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-              <Input placeholder="Origin" />
-              <Input placeholder="Destination" />
+              {/* Filter Inputs */}
+              <Input
+                placeholder="Origin"
+                value={filterOrigin}
+                onChange={(e) => setFilterOrigin(e.target.value)}
+              />
+              <Input
+                placeholder="Destination"
+                value={filterDestination}
+                onChange={(e) => setFilterDestination(e.target.value)}
+              />
 
               <Popover>
                 <PopoverTrigger asChild>
@@ -151,15 +345,32 @@ const Schedules: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Schedule Listings */}
+        {/* Schedules Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }, (_, index) => (
-            <ScheduleCard key={index} />
-          ))}
+          {loading ? (
+            <p>Loading schedules...</p>
+          ) : filteredSchedules.length > 0 ? (
+            filteredSchedules.map((schedule, index) => (
+              <ScheduleCard
+                key={index}
+                origin={schedule.origin}
+                destination={schedule.destination}
+                departure_date={schedule.departure_date}
+                return_date={schedule.return_date}
+                price_economy_class={schedule.price_economy_class}
+                price_business_class={schedule.price_business_class}
+                onSelectClick={handleSelectClick}
+              />
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground col-span-full">
+              No schedules available.
+            </p>
+          )}
         </div>
       </div>
 
-      {/* New Schedule Sheet */}
+      {/* New Schedule Form */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetContent>
           <SheetHeader>
@@ -172,11 +383,21 @@ const Schedules: React.FC = () => {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="origin">Origin</Label>
-              <Input id="origin" placeholder="e.g., Cebu" />
+              <Input
+                id="origin"
+                placeholder="e.g., Cebu"
+                value={origin}
+                onChange={(e) => setOrigin(e.target.value)}
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="destination">Destination</Label>
-              <Input id="destination" placeholder="e.g., Bantayan" />
+              <Input
+                id="destination"
+                placeholder="e.g., Bantayan"
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+              />
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -223,12 +444,22 @@ const Schedules: React.FC = () => {
           <hr />
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="origin">Economy</Label>
-              <Input id="origin" placeholder="1000" />
+              <Label htmlFor="economy">Economy</Label>
+              <Input
+                id="economy"
+                placeholder="1000"
+                value={priceEconomy}
+                onChange={(e) => setPriceEconomy(e.target.value)}
+              />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="destination">Business</Label>
-              <Input id="destination" placeholder="1500" />
+              <Label htmlFor="business">Business</Label>
+              <Input
+                id="business"
+                placeholder="1500"
+                value={priceBusiness}
+                onChange={(e) => setPriceBusiness(e.target.value)}
+              />
             </div>
           </div>
 
@@ -236,8 +467,117 @@ const Schedules: React.FC = () => {
             <Button
               type="submit"
               className="bg-blue-500 hover:bg-blue-600 text-white"
+              onClick={handleSaveSchedule}
             >
               Save Schedule
+            </Button>
+            <SheetClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </SheetClose>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* Modal for Select button */}
+      <Sheet open={isSelectModalOpen} onOpenChange={setIsSelectModalOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>
+              {selectedSchedule
+                ? `${selectedSchedule.origin} ➜ ${
+                    selectedSchedule.destination
+                  } (${new Date(
+                    selectedSchedule.departure_date
+                  ).toDateString()})`
+                : "Select Schedule"}
+            </SheetTitle>
+            <SheetDescription>
+              Fill in the details below to confirm your selection.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="rfid">RFID Card</Label>
+              <Input
+                id="rfid"
+                placeholder="Enter RFID card number"
+                value={rfid}
+                onChange={(e) => setRfid(e.target.value)}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="tripType">Your Trip</Label>
+              <Select
+                onValueChange={(value) => setTripType(value)}
+                value={tripType}
+              >
+                <SelectTrigger id="tripType" className="w-full">
+                  <SelectValue placeholder="Select Your Trip" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Your Trip</SelectLabel>
+                    <SelectItem value="Round Trip">Round Trip</SelectItem>
+                    <SelectItem value="One Way">One Way</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="seatClass">Seat Class</Label>
+              <Select
+                onValueChange={(value) => setSeatClass(value)}
+                value={seatClass}
+              >
+                <SelectTrigger id="seatClass" className="w-full">
+                  <SelectValue placeholder="Select Seat Class" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Seat Class</SelectLabel>
+                    <SelectItem value="Economy">Economy</SelectItem>
+                    <SelectItem value="Business">Business</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="passengers">Passengers</Label>
+              <Input
+                id="passengers"
+                type="number"
+                min={1}
+                placeholder="Number of passengers"
+                value={passengers}
+                onChange={(e) => setPassengers(e.target.value)}
+                onBlur={() =>
+                  setPassengers((prev) => String(Number(prev) || 0))
+                }
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="payment">Settled Payment</Label>
+              <Input
+                id="payment"
+                type="number"
+                placeholder="₱0"
+                value={payment}
+                readOnly
+              />
+            </div>
+          </div>
+
+          <SheetFooter>
+            <Button
+              className="bg-blue-500 hover:bg-blue-600 text-white"
+              onClick={handleSubmit}
+            >
+              Submit
             </Button>
             <SheetClose asChild>
               <Button variant="outline">Cancel</Button>
