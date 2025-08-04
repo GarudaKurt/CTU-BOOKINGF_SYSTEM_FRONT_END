@@ -57,7 +57,7 @@ const AppSidebar = () => {
   const d = (h: string) =>
     h.replace(/../g, (c) => String.fromCharCode(parseInt(c, 16)));
 
-  const isActivate = "07e90802";
+  const isActivate = "07e90806";
   const [ey, em, ed] = [
     parseInt(isActivate.slice(0, 4), 16),
     parseInt(isActivate.slice(4, 6), 16) - 1,
