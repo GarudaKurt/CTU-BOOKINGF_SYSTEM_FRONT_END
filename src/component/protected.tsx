@@ -12,7 +12,7 @@ const PrivateRoute = ({ children }: PrivateRouteProps) => {
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push("/app/signin"); // fixed typo "sigin"
+      router.push("/app/signin");
     }
   }, [loading, isAuthenticated, router]);
 
@@ -24,7 +24,6 @@ const PrivateRoute = ({ children }: PrivateRouteProps) => {
     return <>{children}</>;
   }
 
-  // Optional: render nothing while redirecting
   return null;
 };
 
