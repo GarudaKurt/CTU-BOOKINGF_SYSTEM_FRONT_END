@@ -32,7 +32,6 @@ export const refresh_token = async (): Promise<boolean> => {
     );
 
     if (response.data.access) {
-      // Store token if needed
       localStorage.setItem("access_token", response.data.access);
       return true;
     }
@@ -44,7 +43,6 @@ export const refresh_token = async (): Promise<boolean> => {
   }
 };
 
-// Generic retry wrapper with token refresh
 export const call_refresh = async <T,>(
   error: AxiosError,
   func: () => Promise<T>
@@ -92,7 +90,7 @@ export const register = async (
       { username, email, password },
       { withCredentials: true }
     );
-    return true; // consider it success if request didn't throw
+    return true;
   } catch (error) {
     console.error("Register failed:", error);
     return false;
@@ -141,7 +139,7 @@ export const bookings = async (
   }
 };
 
-export const getAllBookings = async (): Promise<Booking[] | false> => {
+export const getAllBookings = async (): Promise<any[] | false> => {
   try {
     const res = await axios.get(bookSchedules, {
       withCredentials: true,
@@ -253,11 +251,8 @@ export const updateUserDetails = async (
     role: string;
     birthdate: string;
     address: string;
-    phone: BigInteger;
     rfid_number: string;
-    date_rfid_create: string;
     expiry_rfid: string;
-    rfid_balance: string;
     payment: string;
   }
 ): Promise<boolean> => {
@@ -304,10 +299,10 @@ export const getUserDetailsByRFID = async (
     });
 
     if (res.data && res.data.rfid_number) {
-      return res.data; // success
+      return res.data;
     }
 
-    return false; // no data found
+    return false;
   } catch (error) {
     console.error("Get user by RFID failed:", error);
     return false;

@@ -3,8 +3,6 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { CalendarIcon, PlusCircle } from "lucide-react";
-
-import Admin from "../../page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -52,7 +50,6 @@ type ScheduleProps = {
   onSelectClick?: (schedule: ScheduleProps) => void;
 };
 
-// ScheduleCard component with onSelectClick prop
 const ScheduleCard: React.FC<ScheduleProps> = ({
   origin,
   destination,
@@ -105,20 +102,17 @@ const Schedules: React.FC = () => {
   const [schedules, setSchedules] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Filters state for live filtering
   const [filterOrigin, setFilterOrigin] = useState("");
   const [filterDestination, setFilterDestination] = useState("");
 
-  // Modal state for Select modal
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] =
     useState<ScheduleProps | null>(null);
 
-  // Modal form states
-  const [rfid, setRfid] = useState("");
-  const [tripType, setTripType] = useState("");
-  const [seatClass, setSeatClass] = useState("");
-  const [passengers, setPassengers] = useState("");
+  const [rfid, setRfid] = useState<string>("");
+  const [tripType, setTripType] = useState<string>("");
+  const [seatClass, setSeatClass] = useState<string>("");
+  const [passengers, setPassengers] = useState<string>("");
 
   useEffect(() => {
     if (!selectedSchedule || !seatClass || !passengers) {
@@ -145,7 +139,6 @@ const Schedules: React.FC = () => {
     fetchSchedules();
   }, []);
 
-  // Filter schedules based on origin and destination filters (case insensitive)
   const filteredSchedules = schedules.filter((schedule) => {
     return (
       schedule.origin.toLowerCase().includes(filterOrigin.toLowerCase()) &&
@@ -192,7 +185,6 @@ const Schedules: React.FC = () => {
     setSelectedSchedule(schedule);
     setIsSelectModalOpen(true);
 
-    // Reset modal form fields
     setRfid("");
     setTripType("");
     setSeatClass("");
@@ -221,7 +213,7 @@ const Schedules: React.FC = () => {
       selectedSchedule.origin,
       selectedSchedule.destination,
       selectedSchedule.departure_date,
-      returnDateStr, // only include if Round Trip
+      returnDateStr,
       tripType,
       seatClass,
       passengerCount,
@@ -232,21 +224,18 @@ const Schedules: React.FC = () => {
       alert("Booking successful!");
       setIsSelectModalOpen(false);
 
-      // Reset fields (optional)
       setRfid("");
       setTripType("");
       setSeatClass("");
       setPassengers("");
       setPayment(0);
-
-      // Optionally refresh bookings or schedules here if needed
     } else {
       alert("Booking failed. Please try again.");
     }
   };
 
   return (
-    <Admin>
+    <>
       <div className="p-1 space-y-4">
         <Card>
           <CardHeader>
@@ -345,7 +334,6 @@ const Schedules: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Schedules Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {loading ? (
             <p>Loading schedules...</p>
@@ -585,7 +573,7 @@ const Schedules: React.FC = () => {
           </SheetFooter>
         </SheetContent>
       </Sheet>
-    </Admin>
+    </>
   );
 };
 

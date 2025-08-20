@@ -1,13 +1,25 @@
-// src/app/context/useAuth.tsx
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { is_authenticated, login, register, logout } from "@/api/api";
 import { useRouter } from "next/navigation";
 
-const AuthContext = createContext(null);
+interface AuthContextType {
+  isAuthenticated: boolean;
+  loading: boolean;
+  login_user: (username: string, password: string) => Promise<void>;
+  create_user: (
+    username: string,
+    email: string,
+    password: string,
+    cPassword: string
+  ) => Promise<void>;
+  signOut: () => Promise<void>;
+}
 
-export const AuthProvider = ({ children }) => {
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const route = useRouter();
@@ -23,31 +35,34 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login_user = async (username, password) => {
+  const login_user = async (username: string, password: string) => {
     const success = await login(username, password);
     if (success) {
       setIsAuthenticated(true);
-      console.log("Pass here!!");
       alert("login okay");
-      route.push("/dashboard/sidebar");
+      route.push("/dashboard/home");
     } else {
-      console.log("Pass heee");
+      alert("login failed");
     }
   };
 
-  const create_user = async (username, email, password, cPassword) => {
+  const create_user = async (
+    username: string,
+    email: string,
+    password: string,
+    cPassword: string
+  ) => {
     if (password === cPassword) {
       try {
         const success = await register(username, email, password);
         if (success) {
-          console.log("Success created");
           alert("create okay");
         }
       } catch (error) {
         alert("Error create account");
       }
-
-      console.log("Pass shitt!");
+    } else {
+      alert("Passwords do not match");
     }
   };
 
@@ -56,7 +71,6 @@ export const AuthProvider = ({ children }) => {
       const success = await logout();
       if (success) {
         setIsAuthenticated(false);
-        console.log("Logged out successfully");
         route.push("/");
       } else {
         console.error("Logout API call failed");
@@ -79,4 +93,10 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used inside an AuthProvider");
+  }
+  return context;
+};

@@ -29,7 +29,6 @@ import {
   DialogHeader,
   DialogDescription,
 } from "@/components/ui/dialog";
-import Admin from "../../page";
 import { updateUserDetails, deleteUserDetails } from "@/api/api";
 
 const USERS_API_URL = "http://localhost:8000/api/details/";
@@ -152,14 +151,14 @@ const UserInfo: React.FC = () => {
     if (success) {
       console.log("User updated successfully");
       setIsDialogOpen(false);
-      // Optional: Refresh users list from server here
+      // Refresh list here if needed
     } else {
       console.error("Failed to update user");
     }
   };
 
   return (
-    <Admin>
+    <>
       <Card className="w-full p-6 overflow-x-auto">
         <CardContent>
           <div className="flex items-center gap-2">
@@ -340,7 +339,7 @@ const UserInfo: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
-    </Admin>
+    </>
   );
 };
 
